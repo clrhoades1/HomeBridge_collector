@@ -1,11 +1,11 @@
 # Homebridge Sensor Data Collector
 
 ## Overview
-The Homebridge Sensor Data Collector is a Python-based tool for periodically collecting sensor data from Homebridge-enabled devices. The script interfaces with the Homebridge API to retrieve data, such as temperature readings, and stores it in a SQLite database for further analysis and usage. This tool is ideal for home automation enthusiasts and professionals looking to monitor and analyze data from their Homebridge devices.
+The Homebridge Sensor Data Collector is a Python-based tool for periodically collecting sensor data from Homebridge-enabled devices. The script interfaces with the Homebridge API to retrieve data, such as temperature readings, and stores it in Perquet files for further analysis and usage.
 
 ## Features
 Fetches sensor data from Homebridge API.
-Stores data in a local SQLite database.
+Stores data in local Perquet files
 Easy to set up and run using Docker.
 
 ## Prerequisites
@@ -116,101 +116,3 @@ Run the following commands to build and run the Docker container:
 docker build -t homebridge-collector .
 docker run -d homebridge-collector
 ```
-
-### Data Storage
-Sensor data collected from the Homebridge API is stored in a SQLite database (homebridge_data.db) within the Docker container. This database can be queried for data analysis and monitoring purposes.
-
-### Contributing
-Contributions to enhance this project are welcome. Please fork the repository and submit pull requests for review.
-
-
-
-
-
-
-
-
-
-
-
-
-I need you to add a further description on how to get the uniqueId of your device using the SwaggerUi first du get a token via /api/auth/login and then to call the /api/accessories to get all deivces xconnected to the homebridge to find thier UniqueID. 
-
-/api/auth/login
-Exchange a username and password for an authentication token.
-
-Parameters
-Cancel
-Reset
-No parameters
-
-Request body
-
-application/json
-{
-  "username": "admin",
-  "password": "admin",
-  "otp": "string"
-}
-Execute
-Clear
-Responses
-Curl
-
-curl -X 'POST' \
-  'http://192.168.2.20:8181/api/auth/login' \
-  -H 'accept: */*' \
-  -H 'Content-Type: application/json' \
-  -d '{
-  "username": "admin",
-  "password": "admin",
-  "otp": "string"
-}'
-Request URL
-http://192.168.2.20:8181/api/auth/login
-Server response
-Code	Details
-201	
-Response body
-Download
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwibmFtZSI6IkFkbWluaXN0cmF0b3IiLCJhZG1pbiI6dHJ1ZSwiaW5zdGFuY2VJZCI6IjJiMGNiYzZmOTg0NDc0ZWE3ZTRkZjBjN2FiOTE2NTVkNjg3OWRhYTIzODJkMjA4N2Y5ZDViZGY2NjMzNjI3NjUiLCJpYXQiOjE3MDI0MTUwOTMsImV4cCI6MTcwMjQ0Mzg5M30.KRivjovNWYHFcoJTES9zi2I3H15DRBPKZ4avOYrE48k",
-  "token_type": "Bearer",
-  "expires_in": 28800
-}
-Response headers
- connection: keep-alive 
- content-length: 368 
- content-security-policy: default-src 'self';script-src 'self' 'unsafe-inline' 'unsafe-eval';style-src 'self' 'unsafe-inline';img-src 'self' data: https://raw.githubusercontent.com https://user-images.githubusercontent.com;connect-src 'self' https://openweathermap.org https://api.openweathermap.org wss://192.168.2.20:8181 ws://192.168.2.20:8181 
- content-type: application/json; charset=utf-8 
- date: Tue,12 Dec 2023 21:04:53 GMT 
- keep-alive: timeout=72 
- origin-agent-cluster: ?1 
- referrer-policy: no-referrer 
- vary: Origin 
- x-content-type-options: nosniff 
- x-dns-prefetch-control: off 
- x-download-options: noopen 
- x-permitted-cross-domain-policies: none 
- x-xss-protection: 0 
-Responses
-Code	Description	Links
-201
-
-Accessories
-
-
-GET
-/api/accessories
-Return a list of Homebridge accessories.
-
-
-Homebridge must be running in "insecure" mode to access the accessory list.
-
-Parameters
-Try it out
-No parameters
-
-Responses
-Code	Description	Links
-200	

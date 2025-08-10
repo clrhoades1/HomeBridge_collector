@@ -5,6 +5,10 @@ import time
 import os
 import pandas as pd
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -42,7 +46,7 @@ def insert_data(timestamp, device_id, current_temperature, target_temperature):
     # Write DataFrame back ot the file
     parquet_df.to_parquet(parquet_file_name)
 
-    
+
 
 # Function to query the Homebridge API
 def query_homebridge_api(token):
@@ -54,9 +58,16 @@ def query_homebridge_api(token):
         data = response.json()
 
         # Here is where we will query to get the values we want to extract. 
-        
-        current_temperature = data['values']['CurrentTemperature']
-        target_temperature = data['values']['TargetTemperature']
+
+        # TODO:  Need a better default value
+        current_temperature = -255
+        target_temperature = -255
+
+        for service_characteristic in data['serviceCharacteristics']:
+            if service_characteristic['type'] == "CurrentTemperature":
+                current_temperature = service_characteristic['value']
+            if service_characteristic['type'] == "TargetTemperature":
+                target_temperature = service_characteristic['value']
 
         insert_data(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "34f747c785c7", current_temperature, target_temperature)
 
