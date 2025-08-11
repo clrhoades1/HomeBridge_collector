@@ -4,8 +4,8 @@
 The Homebridge Sensor Data Collector is a Python-based tool for periodically collecting sensor data from Homebridge-enabled devices. The script interfaces with the Homebridge API to retrieve data, such as temperature readings, and stores it in Perquet files for further analysis and usage.
 
 ## Features
-Fetches sensor data from Homebridge API.
-Stores data in local Perquet files
+- Fetches sensor data from Homebridge API.
+- Stores data in local Perquet files
 
 ## Prerequisites
 
@@ -27,6 +27,7 @@ Edit the ```.env``` file with your Homebridge details:
 API_USERNAME=YOUR_HOMEBRIDGE_USERNAME
 API_PASSWORD=YOUR_HOMEBRIDGE_PASSWORD
 API_OPT=YOUR_ONE_TIME_PASSWORD_IF_USED
+API_BASE_DEVICE_URL=http://YOUR_HOMEBRIDGE_IP:PORT/
 API_LOGIN_URL=http://YOUR_HOMEBRIDGE_IP:PORT/api/auth/login
 API_DEVICE_URL=http://YOUR_HOMEBRIDGE_IP:PORT/api/accessories/YOUR_DEVICE_UNIQUE_ID
 PARQUET_FOLDER_PATH=PATH_FOR_PARQUET_FILES
@@ -36,7 +37,14 @@ PARQUET_FOLDER_PATH=PATH_FOR_PARQUET_FILES
 - For `YOUR_DEVICE_UNIQUE_ID`, refer to your Homebridge device's unique identifier. See instructions for obtaining it below
 - For `PARQUET_FOLDER_PATH`, enter the absolute path of where the parquet files should be stored. 
 
-#### Obtaining Device Unique ID using Swagger UI
+#### Automated: Obtaining Device Unique ID using Swagger UI
+- Fill out the Configuration file with the ```API_USERNAME```, ```API_PASSWORD```, ```API_OPT```, and ```API_BASE_DEVICE_URL``` values. 
+- Run the ```collect-homebridge-device-information.py```
+- Open ```homebridge-device-information.json``` file. It is recommended that the text editor used to open the file be able to format it to be more readable. 
+- The file will have a list of JSON objects. Look for the JSON object describing the sensor you are attempting to pull data from. At the end of that JSON object for that sensor is a field called ```uniqueId```, that is the value needed. 
+- Add this unique ID to the API_DEVICE_URL variable in the .env file
+
+#### Manual: Obtaining Device Unique ID using Swagger UI
 
 To obtain the unique ID of your device through the Homebridge API using Swagger UI, you need to first get an authentication token and then use this token to access the device information. Here’s how to do it step-by-step:
 
@@ -80,6 +88,7 @@ Example Response:
 
 - **Find the Unique ID**: The response will include a list of all connected Homebridge accessories. Look through the list to find the unique ID of the device you are interested in.
 
+- **Add this device ID to the API_DEVICE_URL variable in the .env file**
 
 
 ## Running the process
