@@ -21,7 +21,7 @@ Before running the script, ensure your Homebridge API is set up and accessible. 
 - Homebridge Device URL (each device has a unique URL)
 
 ### 2. Configuration File (.env)
-Edit the ```.env``` file with your Homebridge details:
+Copy over the ```.env-example``` file and rename that copy ```.env```. Edit the ```.env``` file with your Homebridge details:
 
 ```shell
 API_USERNAME=YOUR_HOMEBRIDGE_USERNAME
