@@ -38,6 +38,7 @@ PARQUET_FOLDER_PATH=PATH_FOR_PARQUET_FILES
 - For `PARQUET_FOLDER_PATH`, enter the absolute path of where the parquet files should be stored. 
 
 #### Automated: Obtaining Device Unique ID using Python
+- Install the necessary Python libraries using ```pip install -r requirements.txt```
 - Fill out the configuration file (```.env```) with the ```API_USERNAME```, ```API_PASSWORD```, ```API_OPT```, and ```API_BASE_DEVICE_URL``` values. 
 - Run the ```collect-homebridge-device-information.py``` program
 - Open the newly generated ```homebridge-device-information.json``` file. It is recommended that the text editor used to open the file be able to format it to be more readable. 
