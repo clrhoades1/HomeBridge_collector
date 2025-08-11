@@ -116,5 +116,4 @@ Example Response:
 
 
 ## Running the process
-
-Simply run ```python collector.py``` to begin the retreival process. Note that the shell used my need higher level privileges, depending on the permissions of the directory storing the Parquet files. 
+Install the required Python libraries first using ```pip install -r requirements.txt```. Then run ```python collector.py``` to begin the retreival process. Note that the shell used my need higher level privileges, depending on the permissions of the directory storing the Parquet files. 
