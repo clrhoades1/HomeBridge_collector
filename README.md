@@ -37,12 +37,36 @@ PARQUET_FOLDER_PATH=PATH_FOR_PARQUET_FILES
 - For `YOUR_DEVICE_UNIQUE_ID`, refer to your Homebridge device's unique identifier. See instructions for obtaining it below
 - For `PARQUET_FOLDER_PATH`, enter the absolute path of where the parquet files should be stored. 
 
-#### Automated: Obtaining Device Unique ID using Swagger UI
-- Fill out the Configuration file with the ```API_USERNAME```, ```API_PASSWORD```, ```API_OPT```, and ```API_BASE_DEVICE_URL``` values. 
-- Run the ```collect-homebridge-device-information.py```
-- Open ```homebridge-device-information.json``` file. It is recommended that the text editor used to open the file be able to format it to be more readable. 
-- The file will have a list of JSON objects. Look for the JSON object describing the sensor you are attempting to pull data from. At the end of that JSON object for that sensor is a field called ```uniqueId```, that is the value needed. 
-- Add this unique ID to the API_DEVICE_URL variable in the .env file
+#### Automated: Obtaining Device Unique ID using Python
+- Fill out the configuration file (```.env```) with the ```API_USERNAME```, ```API_PASSWORD```, ```API_OPT```, and ```API_BASE_DEVICE_URL``` values. 
+- Run the ```collect-homebridge-device-information.py``` program
+- Open the newly generated ```homebridge-device-information.json``` file. It is recommended that the text editor used to open the file be able to format it to be more readable. 
+- The file will have a list of JSON objects, one object per accessory. Look for the JSON object describing the sensor you are attempting to pull data from. At the end of that JSON object for that sensor is a field called ```uniqueId```, that is the value needed. 
+
+```json
+{
+        "aid": 2,
+        "iid": 8,
+        "uuid": "0000004A-0000-...",
+        "type": "Thermostat",
+        "humanType": "Thermostat",
+        "serviceName": "Thermostat",
+        "serviceCharacteristics": [
+            ...
+        ]
+        "instance": {
+            "name": "homebridge",
+            "username": "...",
+            "ipAddress": "...",
+            "port": ...,
+            "services": [],
+            "connectionFailedCount": 0,
+            "configurationNumber": "3"
+        },
+        "uniqueId": "f3cdb82ffd757cebbcb136ac384e4331e805cfe082dab2e181044b0b33c65b67"
+}
+```
+- Add this ```uniqueID``` to the API_DEVICE_URL variable in the .env file
 
 #### Manual: Obtaining Device Unique ID using Swagger UI
 
