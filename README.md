@@ -11,6 +11,11 @@ The Homebridge Sensor Data Collector is a Python-based tool for periodically col
 
 - Homebridge setup with accessible API
 
+## Future Add-ons
+- [ ] Support pulling data for multiple accessories
+- [ ] Extend the data being pulled based on the type of accessory
+- [ ] Separate out the Parquet files (critera for this are TBD)
+
 ## Setup and Configuration
 
 ### 1. Configure Homebridge API Access
