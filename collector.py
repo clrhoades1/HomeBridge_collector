@@ -6,6 +6,8 @@ import os
 import pandas as pd
 from datetime import datetime
 from dotenv import load_dotenv
+import json
+
 
 # Load environment variables from .env file
 load_dotenv()
@@ -31,7 +33,7 @@ def login():
     return token_info['access_token'], datetime.now() + timedelta(seconds=token_info['expires_in'])
 
 # Function to insert data into Parquet File
-def insert_data(timestamp, device_id, current_temperature, target_temperature):
+def insert_thermostat_data(timestamp, device_id, current_temperature, target_temperature):
     parquet_file_name = os.getenv('PARQUET_FOLDER_PATH') + "" + generate_parquet_file_name()
     
     # Read existing Parquet file to DataFrame (if it exists)
@@ -46,12 +48,23 @@ def insert_data(timestamp, device_id, current_temperature, target_temperature):
     # Write DataFrame back ot the file
     parquet_df.to_parquet(parquet_file_name)
 
+def process_thermostat(data, device_id):
+     # TODO:  Need a better default value
+    current_temperature = -255
+    target_temperature = -255
 
+    for service_characteristic in data['serviceCharacteristics']:
+        if service_characteristic['type'] == "CurrentTemperature":
+            current_temperature = service_characteristic['value']
+        if service_characteristic['type'] == "TargetTemperature":
+            target_temperature = service_characteristic['value']
+
+    insert_thermostat_data(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), device_id, current_temperature, target_temperature)
 
 # Function to query the Homebridge API
-def query_homebridge_api(token):
+def query_homebridge_api(token, device_name, device_id):
     try:
-        device_url = os.getenv('API_DEVICE_URL')
+        device_url = os.getenv('API_DEVICE_URL') + device_id
         headers = {"Authorization": f"Bearer {token}"}
         response = requests.get(device_url, headers=headers)
         response.raise_for_status()
@@ -59,17 +72,8 @@ def query_homebridge_api(token):
 
         # Here is where we will query to get the values we want to extract. 
 
-        # TODO:  Need a better default value
-        current_temperature = -255
-        target_temperature = -255
-
-        for service_characteristic in data['serviceCharacteristics']:
-            if service_characteristic['type'] == "CurrentTemperature":
-                current_temperature = service_characteristic['value']
-            if service_characteristic['type'] == "TargetTemperature":
-                target_temperature = service_characteristic['value']
-
-        insert_data(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "34f747c785c7", current_temperature, target_temperature)
+        if device_name == "thermostat":
+            process_thermostat(data, device_id)
 
     except requests.RequestException as e:
         logging.error(f"API request failed: {e}")
@@ -77,12 +81,19 @@ def query_homebridge_api(token):
 def main():
     try:
         token, token_expiry = login()
+        # Assuming you have a file named 'example.json' with JSON content
+        # example.json: {"product": "Laptop", "price": 1200}
+
+        with open('./device-details.json', 'r') as f:
+            device_data = json.load(f)
+
 
         while True:  
-            if datetime.now() >= token_expiry:
-                token, token_expiry = login()
-            
-            query_homebridge_api(token)
+            for device_name, device_id in device_data.items():
+                if datetime.now() >= token_expiry:
+                    token, token_expiry = login()
+                
+                query_homebridge_api(token, device_name, device_id)
             time.sleep(60)  # Wait for 60 seconds before the next iteration
 
     except Exception as e:

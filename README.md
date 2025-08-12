@@ -34,13 +34,21 @@ API_PASSWORD=YOUR_HOMEBRIDGE_PASSWORD
 API_OPT=YOUR_ONE_TIME_PASSWORD_IF_USED
 API_BASE_DEVICE_URL=http://YOUR_HOMEBRIDGE_IP:PORT/
 API_LOGIN_URL=http://YOUR_HOMEBRIDGE_IP:PORT/api/auth/login
-API_DEVICE_URL=http://YOUR_HOMEBRIDGE_IP:PORT/api/accessories/YOUR_DEVICE_UNIQUE_ID
-PARQUET_FOLDER_PATH=PATH_FOR_PARQUET_FILES
+API_DEVICE_URL=http://YOUR_HOMEBRIDGE_IP:PORT/api/accessories/
 ```
 - Replace `YOUR_HOMEBRIDGE_USERNAME` and `YOUR_HOMEBRIDGE_PASSWORD` with your Homebridge credentials.
 - Adjust `YOUR_HOMEBRIDGE_IP` and `PORT` to match your Homebridge server address and port.
 - For `YOUR_DEVICE_UNIQUE_ID`, refer to your Homebridge device's unique identifier. See instructions for obtaining it below
 - For `PARQUET_FOLDER_PATH`, enter the absolute path of where the parquet files should be stored. 
+
+Additionally, create a file named ```device-details.json```. Create a JSON object in that file such that it has each device name and the id of each device in it. Review the below details for obtaining the various device IDs. Example of the JSON object:
+
+```json
+{
+    "thermostat": "f3cdb82f...", 
+    "pill_sensor": "37asdf9..."
+}
+```
 
 #### Automated: Obtaining Device Unique ID using Python
 - Install the necessary Python libraries using ```pip install -r requirements.txt```
