@@ -2,3 +2,4 @@
 homebridge-device-information.json
 device-details.json
 planning_device_extraction.md
+homebridge/*
