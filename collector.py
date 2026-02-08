@@ -2,7 +2,8 @@ import json
 import logging
 import os
 import time
-from asyncio.windows_events import NULL
+
+# from asyncio.windows_events import NULL
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -16,8 +17,8 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
 
-def generate_parquet_file_name():
-    return "temperature-sensor-" + datetime.today().strftime("%Y-%m-%d") + ".parquet"
+def generate_parquet_file_name(type):
+    return type + "-sensor-" + datetime.today().strftime("%Y-%m-%d") + ".parquet"
 
 
 # Function to login and retrieve the access token
@@ -41,7 +42,9 @@ def insert_thermostat_data(
     timestamp, device_id, device_name, current_temperature, target_temperature
 ):
     parquet_file_name = (
-        os.getenv("PARQUET_FOLDER_PATH") + "" + generate_parquet_file_name()
+        os.getenv("PARQUET_FOLDER_PATH")
+        + ""
+        + generate_parquet_file_name("temperature")
     )
 
     # Read existing Parquet file to DataFrame (if it exists)
@@ -77,7 +80,7 @@ def insert_switch_data(
     is_on,
 ):
     parquet_file_name = (
-        os.getenv("PARQUET_FOLDER_PATH") + "" + generate_parquet_file_name()
+        os.getenv("PARQUET_FOLDER_PATH") + "" + generate_parquet_file_name("switch")
     )
 
     # Read existing Parquet file to DataFrame (if it exists)
@@ -180,7 +183,7 @@ def main():
                     token, token_expiry = login()
 
                 query_homebridge_api(token, device_name, device_id)
-            time.sleep(60)  # Wait for 60 seconds before the next iteration
+            time.sleep(1)  # Wait for 60 seconds before the next iteration
 
     except Exception as e:
         logging.error(f"An error occurred: {e}")
