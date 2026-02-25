@@ -37,6 +37,15 @@ def login():
     )
 
 
+def insert_to_google_sheet(action, sensor):
+    payload = {"action": action, "sensor": sensor}
+    response = requests.get(
+        "https://script.google.com/macros/s/AKfycbx7_vO7I_Vob-tpVeyq-aDwIHwUEgDWKc8yclkvY25MW2fRuvjX0XgPMBZ4lequnaX5/exec",
+        params=payload,
+    )
+    print(response.content)
+
+
 # Function to insert data into Parquet File
 def insert_thermostat_data(
     timestamp, device_id, device_name, current_temperature, target_temperature
@@ -72,6 +81,8 @@ def insert_thermostat_data(
     # Write DataFrame back ot the file
     parquet_df.to_parquet(parquet_file_name)
 
+    insert_to_google_sheet(current_temperature, device_name)
+
 
 def insert_switch_data(
     timestamp,
@@ -106,6 +117,7 @@ def insert_switch_data(
 
     # Write DataFrame back ot the file
     parquet_df.to_parquet(parquet_file_name)
+    insert_to_google_sheet(is_on, device_name)
 
 
 def process_thermostat(data, device_id):
@@ -183,7 +195,7 @@ def main():
                     token, token_expiry = login()
 
                 query_homebridge_api(token, device_name, device_id)
-            time.sleep(1)  # Wait for 60 seconds before the next iteration
+            time.sleep(10)  # Wait for 60 seconds before the next iteration
 
     except Exception as e:
         logging.error(f"An error occurred: {e}")
