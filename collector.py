@@ -40,7 +40,7 @@ def login():
 def insert_to_google_sheet(action, sensor):
     payload = {"action": action, "sensor": sensor}
     response = requests.get(
-        "https://script.google.com/macros/s/AKfycbx7_vO7I_Vob-tpVeyq-aDwIHwUEgDWKc8yclkvY25MW2fRuvjX0XgPMBZ4lequnaX5/exec",
+        os.getenv("GOOGLE_SHEET_SCRIPT_URL"),
         params=payload,
     )
     print(response.content)
