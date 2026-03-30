@@ -1,20 +1,21 @@
 import json
 import logging
 import os
+import sys
 import time
-
-# from asyncio.windows_events import NULL
-from datetime import datetime, timedelta
 
 import pandas as pd
 import requests
 from dotenv import load_dotenv
+from filelock import FileLock
 
 # Load environment variables from .env file
 load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
+
+LOCK_FILE = "/tmp/collector.lock"
 
 
 def generate_parquet_file_name(type):
@@ -77,19 +78,24 @@ def insert_thermostat_data(
         ],
         ignore_index=True,
     )
+    # Get the last found value in the Parquet file
+    previous_data_entry = pd.read_parquet(parquet_file_name).tail(1)
 
-    # Write DataFrame back ot the file
+    # Write DataFrame back to the file
     parquet_df.to_parquet(parquet_file_name)
 
-    insert_to_google_sheet(current_temperature, device_name)
+    if is_latest_data_new(previous_data_entry, parquet_df):
+        insert_to_google_sheet(current_temperature, device_name)
 
 
-def insert_switch_data(
-    timestamp,
-    device_id,
-    device_name,
-    is_on,
-):
+def is_latest_data_new(previous_item: pd.DataFrame, new_item: pd.DataFrame):
+    previous_item = previous_item.drop("timestamp", axis=1)
+    new_item = new_item.drop("timestamp", axis=1)
+
+    return new_item.equals(previous_item)
+
+
+def insert_switch_data(timestamp, device_id, device_name, is_on, outlet_in_use):
     parquet_file_name = (
         os.getenv("PARQUET_FOLDER_PATH") + "" + generate_parquet_file_name("switch")
     )
@@ -109,15 +115,21 @@ def insert_switch_data(
                     "timestamp": [timestamp],
                     "device name": [device_name],
                     "is on": [is_on],
+                    "Outlet in use": [outlet_in_use],
                 }
             ),
         ],
         ignore_index=True,
     )
 
+    # Get the last found value in the Parquet file
+    previous_data_entry = pd.read_parquet(parquet_file_name).tail(1)
+
     # Write DataFrame back ot the file
     parquet_df.to_parquet(parquet_file_name)
-    insert_to_google_sheet(is_on, device_name)
+
+    if is_latest_data_new(previous_data_entry, parquet_df):
+        insert_to_google_sheet(is_on, device_name)
 
 
 def process_thermostat(data, device_id):
@@ -146,17 +158,21 @@ def process_switch(data, device_id):
     # TODO:  Need a better default value
     is_on = "unknown"
     device_name = "unassigned"
+    outlet_in_use = 0
 
     for service_characteristic in data["serviceCharacteristics"]:
         if service_characteristic["type"] == "On":
             is_on = service_characteristic["value"]
             device_name = service_characteristic["serviceName"]
+        if service_characteristic["type"] == "OutletInUse":
+            outlet_in_use = service_characteristic["value"]
 
     insert_switch_data(
         datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         device_id,
         device_name,
         is_on,
+        outlet_in_use,
     )
 
 
@@ -182,23 +198,37 @@ def query_homebridge_api(token, device_name, device_id):
 
 def main():
     try:
-        token, token_expiry = login()
-        # Assuming you have a file named 'example.json' with JSON content
-        # example.json: {"product": "Laptop", "price": 1200}
+        with FileLock(LOCK_FILE, timeout=1):
+            token, token_expiry = login()
+            # Assuming you have a file named 'example.json' with JSON content
+            # example.json: {"product": "Laptop", "price": 1200}
 
-        with open("./device-details.json", "r") as f:
-            device_data = json.load(f)
+            with open("./device-details.json", "r") as f:
+                device_data = json.load(f)
 
-        while True:
-            for device_name, device_id in device_data.items():
-                if datetime.now() >= token_expiry:
-                    token, token_expiry = login()
+            while True:
+                for device_name, device_id in device_data.items():
+                    if datetime.now() >= token_expiry:
+                        token, token_expiry = login()
 
-                query_homebridge_api(token, device_name, device_id)
-            time.sleep(10)  # Wait for 60 seconds before the next iteration
-
+                    query_homebridge_api(token, device_name, device_id)
+                time.sleep(10)  # Wait for 60 seconds before the next iteration
+    except TimeoutError:
+        print(
+            f"Another instance of the program is already running with lock file: {LOCK_FILE}"
+        )
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print("Keyboard interrupt was received")
     except Exception as e:
         logging.error(f"An error occurred: {e}")
+    finally:
+        if os.path.exists(LOCK_FILE):
+            try:
+                os.remove(LOCK_FILE)
+                print(f"Removed stale lock file: {LOCK_FILE}")
+            except OSError as e:
+                print(f"Error removing lock file: {e}")
 
 
 # Execute the main function
