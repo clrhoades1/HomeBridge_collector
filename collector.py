@@ -1,8 +1,10 @@
+import datetime
 import json
 import logging
 import os
 import sys
 import time
+from datetime import datetime, timedelta
 
 import pandas as pd
 import requests
@@ -79,7 +81,10 @@ def insert_thermostat_data(
         ignore_index=True,
     )
     # Get the last found value in the Parquet file
-    previous_data_entry = pd.read_parquet(parquet_file_name).tail(1)
+    if os.path.isfile(parquet_file_name):
+        previous_data_entry = pd.read_parquet(parquet_file_name).tail(1)
+    else:
+        previous_data_entry = pd.DataFrame()
 
     # Write DataFrame back to the file
     parquet_df.to_parquet(parquet_file_name)
@@ -123,7 +128,10 @@ def insert_switch_data(timestamp, device_id, device_name, is_on, outlet_in_use):
     )
 
     # Get the last found value in the Parquet file
-    previous_data_entry = pd.read_parquet(parquet_file_name).tail(1)
+    if os.path.isfile(parquet_file_name):
+        previous_data_entry = pd.read_parquet(parquet_file_name).tail(1)
+    else:
+        previous_data_entry = pd.DataFrame()
 
     # Write DataFrame back ot the file
     parquet_df.to_parquet(parquet_file_name)
