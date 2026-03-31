@@ -137,7 +137,9 @@ def insert_switch_data(timestamp, device_id, device_name, is_on, outlet_in_use):
 
     # Get the last found value in the Parquet file
     if os.path.isfile(parquet_file_name):
-        previous_data_entry = pd.read_parquet(parquet_file_name).tail(1)
+        previous_data_entry = pd.read_parquet(parquet_file_name)
+        previous_data_entry = previous_data_entry.loc[previous_data_entry['device name'] == device_name]
+        previous_data_entry = previous_data_entry.iloc[-1:]
     else:
         previous_data_entry = pd.DataFrame()
 
@@ -205,7 +207,7 @@ def query_homebridge_api(token, device_name, device_id):
 
         if device_name == "thermostat":
             process_thermostat(data, device_id)
-        elif device_name == "switch":
+        elif "switch" in device_name:
             process_switch(data, device_id)
 
     except requests.RequestException as e:
