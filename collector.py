@@ -94,10 +94,18 @@ def insert_thermostat_data(
 
 
 def is_latest_data_new(previous_item: pd.DataFrame, new_item: pd.DataFrame):
-    previous_item = previous_item.drop("timestamp", axis=1)
-    new_item = new_item.drop("timestamp", axis=1)
+    if previous_item.empty:
+        return True
 
-    return new_item.equals(previous_item)
+    latest_item = new_item.tail(1).reset_index(drop=True)
+    previous_item = previous_item.reset_index(drop=True)
+
+    # Compare only value columns, not timestamps.
+    latest_item = latest_item.drop("timestamp", axis=1, errors="ignore")
+    previous_item = previous_item.drop("timestamp", axis=1, errors="ignore")
+
+    # Return True when the latest row is different from the previous row (new data).
+    return not latest_item.equals(previous_item)
 
 
 def insert_switch_data(timestamp, device_id, device_name, is_on, outlet_in_use):
