@@ -146,9 +146,13 @@ def insert_switch_data(timestamp, device_id, device_name, is_on, outlet_in_use):
     # Write DataFrame back ot the file
     parquet_df.to_parquet(parquet_file_name)
 
-    if is_latest_data_new(previous_data_entry, parquet_df):
-        insert_to_google_sheet(is_on, device_name)
+    json_attributes = generate_json_attributes("is_on", is_on, "outlet_in_use", outlet_in_use)
 
+    if is_latest_data_new(previous_data_entry, parquet_df):
+        insert_to_google_sheet(action=json_attributes, sensor=device_name)
+
+def generate_json_attributes(attr1, value1, attr2, value2):
+    return "{ " + attr1 + ": " + str(value1) + "," + attr2 + ": " + str(value2) + "}"
 
 def process_thermostat(data, device_id):
     # TODO:  Need a better default value
