@@ -2,6 +2,7 @@ import datetime
 import json
 import logging
 import os
+import re
 import sys
 import time
 from datetime import datetime, timedelta
@@ -18,6 +19,9 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
 LOCK_FILE = "/tmp/collector.lock"
+LOG_LINE_PATTERN = re.compile(
+    r".*?\[(?P<timestamp>\d{1,2}/\d{1,2}/\d{4},\s*\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM))\].*?\[(?P<device>[^\]]+)\]\s+current power\s+\[(?P<power>[^\]]+)\]\s+current voltage\s+\[(?P<voltage>[^\]]+)\]\s+current current\s+\[(?P<current>[^\]]+)\]"
+)
 
 
 def generate_parquet_file_name(type):
@@ -65,7 +69,18 @@ def insert_thermostat_data(
     if os.path.exists(parquet_file_name):
         parquet_df = pd.read_parquet(parquet_file_name)
 
-    # Append new value to it
+    # Check if this is new data
+    is_new = True
+    if not parquet_df.empty:
+        last_entry = parquet_df.iloc[-1]
+        # Compare current and target temperature (ignore timestamp)
+        if (
+            last_entry["current temperature"] == current_temperature
+            and last_entry["target temperature"] == target_temperature
+        ):
+            is_new = False
+
+    # Always append to Parquet
     parquet_df = pd.concat(
         [
             parquet_df,
@@ -80,16 +95,12 @@ def insert_thermostat_data(
         ],
         ignore_index=True,
     )
-    # Get the last found value in the Parquet file
-    if os.path.isfile(parquet_file_name):
-        previous_data_entry = pd.read_parquet(parquet_file_name).tail(1)
-    else:
-        previous_data_entry = pd.DataFrame()
 
     # Write DataFrame back to the file
     parquet_df.to_parquet(parquet_file_name)
 
-    if is_latest_data_new(previous_data_entry, parquet_df):
+    # Only send to Google Sheet if data is new
+    if is_new:
         insert_to_google_sheet(current_temperature, device_name)
 
 
@@ -119,7 +130,20 @@ def insert_switch_data(timestamp, device_id, device_name, is_on, outlet_in_use):
     if os.path.exists(parquet_file_name):
         parquet_df = pd.read_parquet(parquet_file_name)
 
-    # Append new value to it
+    # Check if this is new data for the device
+    is_new = True
+    if not parquet_df.empty:
+        device_entries = parquet_df[parquet_df["device name"] == device_name]
+        if not device_entries.empty:
+            last_entry = device_entries.iloc[-1]
+            # Compare is_on and Outlet in use (ignore timestamp)
+            if (
+                last_entry["is on"] == is_on
+                and last_entry["Outlet in use"] == outlet_in_use
+            ):
+                is_new = False
+
+    # Always append to Parquet
     parquet_df = pd.concat(
         [
             parquet_df,
@@ -135,21 +159,71 @@ def insert_switch_data(timestamp, device_id, device_name, is_on, outlet_in_use):
         ignore_index=True,
     )
 
-    # Get the last found value in the Parquet file
-    if os.path.isfile(parquet_file_name):
-        previous_data_entry = pd.read_parquet(parquet_file_name)
-        previous_data_entry = previous_data_entry.loc[previous_data_entry['device name'] == device_name]
-        previous_data_entry = previous_data_entry.iloc[-1:]
-    else:
-        previous_data_entry = pd.DataFrame()
-
-    # Write DataFrame back ot the file
+    # Write DataFrame back to the file
     parquet_df.to_parquet(parquet_file_name)
 
-    json_attributes = generate_json_attributes("is_on", is_on, "outlet_in_use", outlet_in_use)
-
-    if is_latest_data_new(previous_data_entry, parquet_df):
+    # Only send to Google Sheet if data is new
+    if is_new:
+        json_attributes = generate_json_attributes("is_on", is_on, "outlet_in_use", outlet_in_use)
         insert_to_google_sheet(action=json_attributes, sensor=device_name)
+
+
+def insert_log_data(timestamp, device_name, current_power, current_voltage, current_current):
+    parquet_file_name = os.path.join(
+        os.getenv("PARQUET_FOLDER_PATH", ""),
+        generate_parquet_file_name("homebridge-log"),
+    )
+
+    parquet_df = pd.DataFrame()
+    if os.path.exists(parquet_file_name):
+        parquet_df = pd.read_parquet(parquet_file_name)
+
+    # Check if this is new data for the device
+    is_new = True
+    if not parquet_df.empty:
+        device_entries = parquet_df[parquet_df["device name"] == device_name]
+        if not device_entries.empty:
+            last_entry = device_entries.iloc[-1]
+            # Compare power, voltage, current (ignore timestamp)
+            if (
+                last_entry["current power"] == current_power
+                and last_entry["current voltage"] == current_voltage
+                and last_entry["current current"] == current_current
+            ):
+                is_new = False
+
+    # Always append to Parquet
+    parquet_df = pd.concat(
+        [
+            parquet_df,
+            pd.DataFrame(
+                {
+                    "timestamp": [timestamp],
+                    "device name": [device_name],
+                    "current power": [current_power],
+                    "current voltage": [current_voltage],
+                    "current current": [current_current],
+                }
+            ),
+        ],
+        ignore_index=True,
+    )
+
+    parquet_df.to_parquet(parquet_file_name)
+
+    # Only send to Google Sheet if data is new
+    if is_new:
+        insert_to_google_sheet(
+            action=json.dumps(
+                {
+                    "current_power": current_power,
+                    "current_voltage": current_voltage,
+                    "current_current": current_current,
+                }
+            ),
+            sensor=device_name,
+        )
+
 
 def generate_json_attributes(attr1, value1, attr2, value2):
     return "{ " + attr1 + ": " + str(value1) + "," + attr2 + ": " + str(value2) + "}"
@@ -217,6 +291,39 @@ def query_homebridge_api(token, device_name, device_id):
     except requests.RequestException as e:
         logging.error(f"API request failed: {e}")
 
+def parse_homebridge_log(log_file_path=None, last_position=0):
+    if not log_file_path:
+        log_file_path = os.getenv("HOMEBRIDGE_LOG_FILE_PATH", "homebridge/homebridge.log")
+
+    if not os.path.isfile(log_file_path):
+        logging.warning("Homebridge log file not found: %s", log_file_path)
+        return [], 0
+
+    file_size = os.path.getsize(log_file_path)
+    if last_position > file_size:
+        last_position = 0
+
+    parsed_entries = []
+    with open(log_file_path, "r", encoding="utf-8", errors="ignore") as log_file:
+        log_file.seek(last_position)
+        for line in log_file:
+            match = LOG_LINE_PATTERN.search(line)
+            if not match:
+                continue
+
+            parsed_entries.append(
+                {
+                    "timestamp": match.group("timestamp").strip(),
+                    "device_name": match.group("device").strip(),
+                    "current_power": match.group("power").strip(),
+                    "current_voltage": match.group("voltage").strip(),
+                    "current_current": match.group("current").strip(),
+                }
+            )
+
+        last_position = log_file.tell()
+
+    return parsed_entries, last_position
 
 def main():
     try:
@@ -228,7 +335,31 @@ def main():
             with open("./device-details.json", "r") as f:
                 device_data = json.load(f)
 
+            homebridge_log_path = os.getenv(
+                "HOMEBRIDGE_LOG_FILE_PATH", "homebridge/homebridge.log"
+            )
+            log_file_position = 0
+
             while True:
+                parsed_entries, log_file_position = parse_homebridge_log(
+                    homebridge_log_path, log_file_position
+                )
+                for entry in parsed_entries:
+                    logging.debug(
+                        "Parsed Homebridge log entry: %s power=%s voltage=%s current=%s",
+                        entry["device_name"],
+                        entry["current_power"],
+                        entry["current_voltage"],
+                        entry["current_current"],
+                    )
+                    insert_log_data(
+                        entry["timestamp"],
+                        entry["device_name"],
+                        entry["current_power"],
+                        entry["current_voltage"],
+                        entry["current_current"],
+                    )
+
                 for device_name, device_id in device_data.items():
                     if datetime.now() >= token_expiry:
                         token, token_expiry = login()
