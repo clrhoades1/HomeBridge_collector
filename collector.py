@@ -20,7 +20,7 @@ logging.basicConfig(level=logging.INFO)
 
 LOCK_FILE = "/tmp/collector.lock"
 LOG_LINE_PATTERN = re.compile(
-    r".*?\[(?P<timestamp>\d{1,2}/\d{1,2}/\d{4},\s*\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM))\].*?\[eWeLink\]\[39m\s+\[(?P<device>[^\]]+)\]\s+current power\s+\[(?P<power>[^\]]+)\]\s+current voltage\s+\[(?P<voltage>[^\]]+)\]\s+current current\s+\[(?P<current>[^\]]+)\]"
+    r".*?\[(?P<timestamp>\d{1,2}/\d{1,2}/\d{4},\s*\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM))\].*?\[\s*eWeLink\s*\].*?\[(?P<device>[^\]]+)\].*?\[(?P<power>[^\]]+)\](?:.*?\[(?P<voltage>[^\]]+)\])?(?:.*?\[(?P<current>[^\]]+)\])?"
 )
 
 
@@ -316,8 +316,8 @@ def parse_homebridge_log(log_file_path=None, last_position=0):
                     "timestamp": match.group("timestamp").strip(),
                     "device_name": match.group("device").strip(),
                     "current_power": match.group("power").strip(),
-                    "current_voltage": match.group("voltage").strip(),
-                    "current_current": match.group("current").strip(),
+                    "current_voltage": (match.group("voltage") or "").strip(),
+                    "current_current": (match.group("current") or "").strip(),
                 }
             )
 
