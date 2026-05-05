@@ -19,8 +19,9 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
 LOCK_FILE = "/tmp/collector.lock"
+ANSI_ESCAPE_PATTERN = re.compile(r"(?:\x1b\[[0-9;]*m|\[\d+(?:;\d+)*m\]?)")
 LOG_LINE_PATTERN = re.compile(
-    r".*?\[(?P<timestamp>\d{1,2}/\d{1,2}/\d{4},\s*\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM))\].*?\[\s*eWeLink\s*\](?:\[\d+(?:;\d+)*m\]?)*.*?\[(?P<device>[^\]]+)\].*?\[(?P<power>[^\]]+)\](?:.*?\[(?P<voltage>[^\]]+)\])?(?:.*?\[(?P<current>[^\]]+)\])?"
+    r".*?\[(?P<timestamp>\d{1,2}/\d{1,2}/\d{4},\s*\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM))\].*?\[\s*eWeLink\s*\].*?\[(?P<device>[^\]]+)\].*?\[(?P<power>[^\]]+)\](?:.*?\[(?P<voltage>[^\]]+)\])?(?:.*?\[(?P<current>[^\]]+)\])?"
 )
 
 
@@ -307,7 +308,8 @@ def parse_homebridge_log(log_file_path=None, last_position=0):
     with open(log_file_path, "r", encoding="utf-8", errors="ignore") as log_file:
         log_file.seek(last_position)
         for line in log_file:
-            match = LOG_LINE_PATTERN.search(line)
+            clean_line = ANSI_ESCAPE_PATTERN.sub("", line)
+            match = LOG_LINE_PATTERN.search(clean_line)
             if not match:
                 continue
 
