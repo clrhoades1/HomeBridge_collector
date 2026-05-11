@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.INFO)
 LOCK_FILE = "/tmp/collector.lock"
 ANSI_ESCAPE_PATTERN = re.compile(r"(?:\x1b\[[0-9;]*m|\[\d+(?:;\d+)*m\]?)")
 LOG_LINE_PATTERN = re.compile(
-    r".*?\[(?P<timestamp>\d{1,2}/\d{1,2}/\d{4},\s*\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM))\].*?\[\s*eWeLink\s*\].*?\[(?P<device>[^\]]+)\].*?\[(?P<power>[^\]]+)\](?:.*?\[(?P<voltage>[^\]]+)\])?(?:.*?\[(?P<current>[^\]]+)\])?"
+    r".*?\[(?P<timestamp>\d{1,2}/\d{1,2}/\d{4},\s*\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM))\].*?\[\s*eWeLink\s*\].*?\[(?P<device>[^\]]+)\]\s+current power\s+\[(?P<power>[^\]]+)\](?:\s+current voltage\s+\[(?P<voltage>[^\]]+)\])?(?:\s+current current\s+\[(?P<current>[^\]]+)\])?"
 )
 
 

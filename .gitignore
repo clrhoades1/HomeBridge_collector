@@ -5,3 +5,4 @@ planning_device_extraction.md
 homebridge/*
 from_mac/*
 data_generated/*
+example-homebridge.log
