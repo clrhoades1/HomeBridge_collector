@@ -1,8 +1,10 @@
 import datetime
+import gzip
 import json
 import logging
 import os
 import re
+import shutil
 import sys
 import time
 from datetime import datetime, timedelta
@@ -25,8 +27,135 @@ LOG_LINE_PATTERN = re.compile(
 )
 
 
+def get_parquet_root():
+    parquet_root = os.getenv("PARQUET_FOLDER_PATH", "data_generated")
+    parquet_root = os.path.abspath(os.path.expanduser(parquet_root))
+    os.makedirs(parquet_root, exist_ok=True)
+    return parquet_root
+
+
+def ensure_directory(path):
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
 def generate_parquet_file_name(type):
-    return type + "-sensor-" + datetime.today().strftime("%Y-%m-%d") + ".parquet"
+    return f"{type}-sensor-{datetime.today().strftime('%Y-%m-%d')}.parquet"
+
+
+def get_parquet_file_path(type):
+    root_dir = get_parquet_root()
+    type_dir = ensure_directory(os.path.join(root_dir, type))
+    return os.path.join(type_dir, generate_parquet_file_name(type))
+
+
+def get_daily_link_dir():
+    root_dir = get_parquet_root()
+    date_dir = datetime.today().strftime("%Y-%m-%d")
+    return ensure_directory(os.path.join(root_dir, "By-Date", date_dir))
+
+
+def create_daily_parquet_symlink(target_path):
+    link_dir = get_daily_link_dir()
+    link_path = os.path.join(link_dir, os.path.basename(target_path))
+
+    if os.path.lexists(link_path):
+        try:
+            if os.path.islink(link_path):
+                existing_target = os.readlink(link_path)
+                resolved_existing = os.path.abspath(
+                    os.path.join(os.path.dirname(link_path), existing_target)
+                )
+                if resolved_existing == os.path.abspath(target_path):
+                    return
+            os.remove(link_path)
+        except OSError:
+            pass
+
+    try:
+        relative_target = os.path.relpath(target_path, start=os.path.dirname(link_path))
+        os.symlink(relative_target, link_path)
+    except OSError:
+        if os.path.lexists(link_path):
+            os.remove(link_path)
+        os.symlink(target_path, link_path)
+
+
+def update_by_date_symlinks(original_basename, compressed_path):
+    root_dir = get_parquet_root()
+    by_date_root = os.path.join(root_dir, "By-Date")
+    if not os.path.isdir(by_date_root):
+        return
+
+    for dirpath, dirnames, filenames in os.walk(by_date_root):
+        for filename in filenames:
+            link_path = os.path.join(dirpath, filename)
+            if not os.path.islink(link_path):
+                continue
+
+            try:
+                target = os.readlink(link_path)
+            except OSError:
+                continue
+
+            if os.path.basename(target) != original_basename and filename != original_basename:
+                continue
+
+            try:
+                os.remove(link_path)
+            except OSError:
+                continue
+
+            new_name = os.path.basename(compressed_path)
+            new_link_path = os.path.join(dirpath, new_name)
+            if os.path.lexists(new_link_path):
+                try:
+                    os.remove(new_link_path)
+                except OSError:
+                    continue
+
+            try:
+                relative_target = os.path.relpath(compressed_path, start=dirpath)
+                os.symlink(relative_target, new_link_path)
+            except OSError:
+                try:
+                    os.symlink(compressed_path, new_link_path)
+                except OSError:
+                    pass
+
+
+def gzip_old_parquet_files(max_age_days=30):
+    root_dir = get_parquet_root()
+    if not os.path.isdir(root_dir):
+        return
+
+    expiration = time.time() - max_age_days * 86400
+    for entry in os.scandir(root_dir):
+        if not entry.is_dir() or entry.name == "By-Date":
+            continue
+
+        for dirpath, dirnames, filenames in os.walk(entry.path):
+            for filename in filenames:
+                if not filename.endswith(".parquet"):
+                    continue
+
+                parquet_path = os.path.join(dirpath, filename)
+                if os.path.getmtime(parquet_path) > expiration:
+                    continue
+
+                compressed_path = parquet_path + ".gz"
+                if os.path.exists(compressed_path):
+                    continue
+
+                try:
+                    with open(parquet_path, "rb") as src, gzip.open(compressed_path, "wb") as dst:
+                        shutil.copyfileobj(src, dst)
+                    file_stat = os.stat(parquet_path)
+                    os.utime(compressed_path, (file_stat.st_atime, file_stat.st_mtime))
+                    os.remove(parquet_path)
+                    update_by_date_symlinks(filename, compressed_path)
+                except OSError as exc:
+                    logging.error("Failed to gzip old parquet %s: %s", parquet_path, exc)
 
 
 # Function to login and retrieve the access token
@@ -58,11 +187,7 @@ def insert_to_google_sheet(action, sensor):
 def insert_thermostat_data(
     timestamp, device_id, device_name, current_temperature, target_temperature
 ):
-    parquet_file_name = (
-        os.getenv("PARQUET_FOLDER_PATH")
-        + ""
-        + generate_parquet_file_name("temperature")
-    )
+    parquet_file_name = get_parquet_file_path("temperature")
 
     # Read existing Parquet file to DataFrame (if it exists)
     parquet_df = pd.DataFrame()
@@ -98,7 +223,8 @@ def insert_thermostat_data(
     )
 
     # Write DataFrame back to the file
-    parquet_df.to_parquet(parquet_file_name)
+    parquet_df.to_parquet(parquet_file_name, engine="pyarrow", compression="gzip")
+    create_daily_parquet_symlink(parquet_file_name)
 
     # Only send to Google Sheet if data is new
     if is_new:
@@ -121,9 +247,7 @@ def is_latest_data_new(previous_item: pd.DataFrame, new_item: pd.DataFrame):
 
 
 def insert_switch_data(timestamp, device_id, device_name, is_on, outlet_in_use):
-    parquet_file_name = (
-        os.getenv("PARQUET_FOLDER_PATH") + "" + generate_parquet_file_name("switch")
-    )
+    parquet_file_name = get_parquet_file_path("switch")
 
     # Read existing Parquet file to DataFrame (if it exists)
     parquet_df = pd.DataFrame()
@@ -161,7 +285,8 @@ def insert_switch_data(timestamp, device_id, device_name, is_on, outlet_in_use):
     )
 
     # Write DataFrame back to the file
-    parquet_df.to_parquet(parquet_file_name)
+    parquet_df.to_parquet(parquet_file_name, engine="pyarrow", compression="gzip")
+    create_daily_parquet_symlink(parquet_file_name)
 
     # Only send to Google Sheet if data is new
     if is_new:
@@ -170,10 +295,7 @@ def insert_switch_data(timestamp, device_id, device_name, is_on, outlet_in_use):
 
 
 def insert_log_data(timestamp, device_name, current_power, current_voltage, current_current):
-    parquet_file_name = os.path.join(
-        os.getenv("PARQUET_FOLDER_PATH", ""),
-        generate_parquet_file_name("homebridge-log"),
-    )
+    parquet_file_name = get_parquet_file_path("homebridge-log")
 
     parquet_df = pd.DataFrame()
     if os.path.exists(parquet_file_name):
@@ -210,7 +332,8 @@ def insert_log_data(timestamp, device_name, current_power, current_voltage, curr
         ignore_index=True,
     )
 
-    parquet_df.to_parquet(parquet_file_name)
+    parquet_df.to_parquet(parquet_file_name, engine="pyarrow", compression="gzip")
+    create_daily_parquet_symlink(parquet_file_name)
 
     # Only send to Google Sheet if data is new
     if is_new:
@@ -330,6 +453,7 @@ def parse_homebridge_log(log_file_path=None, last_position=0):
 def main():
     try:
         with FileLock(LOCK_FILE, timeout=1):
+            gzip_old_parquet_files(30)
             token, token_expiry = login()
             # Assuming you have a file named 'example.json' with JSON content
             # example.json: {"product": "Laptop", "price": 1200}
